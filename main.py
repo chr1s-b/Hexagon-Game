@@ -16,6 +16,26 @@ SHRINK_SPEED = 0.7
 THICKNESS = 10
 ROTATION_SPEED = 0.15
 
+def text(string, x, y, size, color=(0,0,0)):
+    def linetext(text,x,y,size,color=(0,0,0)):
+        @use_color(*color)
+        def wrapper():
+            glPushMatrix()
+            glRotate(180,1,0,0)
+            glTranslate(x,y,0)
+            default = 120.
+            glScale(size/default, size/default, size/default)
+            for c in text:
+                glutStrokeCharacter(GLUT_STROKE_MONO_ROMAN,ord(c))
+            glPopMatrix()
+            return
+        return wrapper()
+    y = -y
+    lines = string.split("\n")
+    for i, line in enumerate(lines):
+        offset = size+ (size + 10) * i
+        linetext(line, x, y-offset, size, color=color)
+
 class App:
     def __init__(self, title="My 2D OGL App"):
         self.title = title
@@ -99,94 +119,82 @@ class Hexagon:
         hexagon()
         return
 
-def ntext(text, x, y, font, color=(0, 0, 0)):
-    @use_color(*color)
-    def wrapper():
-        glWindowPos2i(x, y)
-        
-        lines = 0
-        for c in text:
-            if c == '\n':
-                glWindowPos2i(x, y-(lines*18))
-            else:
-                glutBitmapCharacter(font, ord(c))
-    return wrapper()
-
-def text(text,x,y,font,color=(0,0,0)):
-    @use_color(*color)
-    def wrapper():
-        glPushMatrix()
-        glTranslate(x,y,0)
-        for c in text:
-            glutStrokeCharacter(font,ord(c))
-        glPopMatrix()
+class Level:
+    def __init__(self,player,shapes):
+        self.player = player
+        self.shapes = shapes
+        self.gameover = False
+        self.score = 0
         return
-    return wrapper()
-    
+
+    def update(self,app):
+        if self.gameover: return
+        p = self.player
+        hexagons = self.shapes
+        # collisions
+        for h in hexagons:
+            if h.radius - p.radius < p.size + h.thickness/2 and h.radius - p.radius > 0:    # check distance
+                if floor((p.angle +120)%360/60) != h.slot:                                  # check angle
+                    self.gameover = True
+                    return
+            elif h.radius > p.radius: break
+        # movement
+        for h in hexagons:
+            h.radius -= SHRINK_SPEED * (1+app.level.score/20.)
+            if h.radius < h.thickness:
+                hexagons.remove(h)
+                hexagons.append(Hexagon(WIDTH))
+                self.score += 1
+        app.frame+=1
+        return False
+
+    def render(self):
+        self.player.display()
+        for s in self.shapes:
+            s.display()
+        return
 
 def main():
-    p = Player(RADIUS, SIZE)
-    hexagons = [Hexagon(WIDTH),Hexagon(WIDTH*1.5)]
     def draw():
         # clear screen
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         glLoadIdentity()
         glOrtho(0,WIDTH,HEIGHT,0,-1,1)
-        # draw some stuff
-        glTranslate(WIDTH/2, HEIGHT/2, 0) # center things
-        glPushMatrix()
-        #slowly rotate to make it more difficult
-        glRotate(myapp.frame*ROTATION_SPEED,0,0,1)
-            
-        if not myapp.gameover:
-            for h in hexagons:
-                #check for collision
-                if h.radius - p.radius < p.size + h.thickness/2:
-                    #check angle
-                    if floor((p.angle +120)%360/60) != h.slot:
-                        #collision
-                        myapp.gameover = True
-                        break
-                elif h.radius > p.radius: break
-            for h in hexagons:
-                h.radius -= SHRINK_SPEED * (1+myapp.score/20.)
-                if h.radius < h.thickness:
-                    hexagons.remove(h)
-                    hexagons.append(Hexagon(WIDTH))
-                    myapp.score += 1
-            myapp.frame+=1
         
-        #render
-        p.display()
-        for h in hexagons:
-            h.display()
+        # center matrix
+        glPushMatrix()
+        glTranslate(WIDTH/2, HEIGHT/2, 0)
+        # slowly rotate
+        glRotate(app.frame*ROTATION_SPEED,0,0,1)
+        # update level
+        app.level.update(app)
+        # render level
+        app.level.render()
+        # uncenter matrix
         glPopMatrix()
 
-        glRotate(180,1,0,0)
-        scale = 0.4
+        # display text
         glLineWidth(4)
-        glPushMatrix()
-        glTranslate(-WIDTH/2,HEIGHT/2 - scale*120 , 0)
-        glScale(scale, scale, scale)
-        text("Score: {}".format(myapp.score), 0, 0, GLUT_STROKE_ROMAN)
-        glPopMatrix()
-        #check again here for gameover because it must be top layer
-        if myapp.gameover:
-            glPushMatrix()
-            scale = 0.5
-            glTranslate(-200, -scale*120/2,0)
-            glScale(scale, scale, 0)
-            text("Game over!", 0, 0, GLUT_STROKE_ROMAN)
-            glPopMatrix()
+        text("Score: {}".format(app.level.score), 4, 4, 24)
+        
+        # gameover state...
+        if app.level.gameover:
+            text("Game over!\nPress SPACE\nto play again", WIDTH/2-120, HEIGHT/2-48, 32)
         glutSwapBuffers()
         return
 
     def mouse_button(button, state, x, y):
         ''' state 0 is down; state 1 is up '''
+        if app.level.gameover:
+            if button == 0:
+                return
+            return
         if button == 4: #scroll down
-            p.angle -= SPEED*state
+            app.level.player.angle -= SPEED*state
+            return
         if button == 3: #scroll up
-            p.angle += SPEED*state
+            app.level.player.angle += SPEED*state
+            return
         return
 
     def keyboard_down(key, x, y):
@@ -194,7 +202,10 @@ def main():
         ''' x and y represent the mouse position  '''
         if key == b'\x1b': # ESC key
             glutLeaveMainLoop()
-
+            return
+        if key == b' ': # SPACE key
+            app.level = Level(Player(RADIUS, SIZE),[Hexagon(WIDTH),Hexagon(WIDTH*1.5)])
+            return
         #check if non-special character
         key = key.decode()
         return
@@ -204,20 +215,21 @@ def main():
 
     def mouse_move(x, y):
         return
-    myapp = App(TITLE)
-    myapp.create_window(WIDTH,HEIGHT)
-    myapp.score = 0
-    myapp.gameover = False
+    
+    app = App(TITLE)
+    app.create_window(WIDTH,HEIGHT)
     glutDisplayFunc( draw )              
     glutIdleFunc( draw )             
     glutMouseFunc( mouse_button )
     glutKeyboardFunc( keyboard_down )    
     glutKeyboardUpFunc( keyboard_up )    
-    glutPassiveMotionFunc( mouse_move )         
+    glutPassiveMotionFunc( mouse_move )
+    
+    app.level_setup = (Player(RADIUS, SIZE),[Hexagon(WIDTH),Hexagon(WIDTH*1.5)])
+    app.level = Level(*app.level_setup)
     
     glClearColor(1, 1, 1, 0);
     glutMainLoop()
-    print(" Clean exit ")
     return
 
 if __name__ == "__main__":
