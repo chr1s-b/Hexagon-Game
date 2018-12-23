@@ -4,7 +4,7 @@ from OpenGL.GL import *
 from OpenGL.GLU import *
 from OpenGL.GLUT import *
 from textureandcolor import *
-from math import pi, cos, sin, sqrt, floor
+from math import pi, cos, sin, sqrt, floor, acos
 from random import randint
 
 TITLE = "Hexagon!"
@@ -12,8 +12,8 @@ WIDTH, HEIGHT =800, 600
 SPEED = 24
 RADIUS = 60
 SIZE = 10
-SHRINK_SPEED = 0.7
-THICKNESS = 10
+SHRINK_SPEED = 0.65
+THICKNESS = 15
 ROTATION_SPEED = 0.15
 
 def text(string, x, y, size, color=(0,0,0)):
@@ -88,36 +88,46 @@ class Player:
         circle(self.size)
         glPopMatrix()
 
-class Hexagon:
+class Shape:
     thickness = THICKNESS
     color = (1,0,0)
-    def __init__(self,radius):
+    def __init__(self,sides,radius):
         self.radius = radius
-        self.slot =randint(0,5)
+        self.sides = sides
+        self.slot =randint(0,self.sides-1)
         return
     
     def display(self):
         #use cosine rule to calculate side_length
-        self.side = sqrt(2*self.radius*self.radius - 2*self.radius*self.radius*cos(2*pi/6.))
-        #draw a hexagon
+        self.side = sqrt(2*self.radius*self.radius - 2*self.radius*self.radius*cos(2*pi/self.sides))
+        #draw the shape
         @use_color(*self.color)
-        def hexagon():
-            for i in range(0,5):
-                a = (i + self.slot-1) * 60
-                glPushMatrix()
-                glRotate(a,0,0,1)
-                glTranslate(self.radius, 0, 0)
-                glRotate(30,0,0,1)
-                glBegin(GL_QUADS)
-                glVertex2f(0, 0)
-                glVertex2f(self.thickness, -self.thickness/1.7)
-                glVertex2f(self.thickness, self.side +self.thickness/1.7)
-                glVertex2f(0, self.side)
-                glEnd()
-                glPopMatrix()
+        def shape():
+            for i in range(0,self.sides):
+                if i != self.slot:
+                    glPushMatrix()
+                    a = 360/self.sides * i
+                    glRotate(a,0,0,1)
+                    glBegin(GL_QUADS)
+                    glVertex2f(self.radius,0)
+                    glVertex2f(self.thickness+self.radius, 0)
+                    glVertex2f((self.radius+self.thickness)*cos(2*pi/self.sides),
+                               (self.radius+self.thickness)*sin(2*pi/self.sides))
+                    glVertex2f(self.radius*cos(2*pi/self.sides), self.radius*sin(2*pi/self.sides))
+                    glEnd()
+                    glPopMatrix()
             return     
-        hexagon()
+        shape()
         return
+
+    def collision(self,player):
+        lowerbound = self.slot*360/self.sides
+        upperbound = lowerbound + 360/self.sides
+        # modify for size of player sprite (converted to degrees in calculation
+        margin = acos((2*self.radius**2-player.size**2)/(2*self.radius**2)) / (2*pi) * 360
+        lowerbound += margin
+        upperbound -= margin
+        return (player.angle < lowerbound or player.angle > upperbound)
 
 class Level:
     def __init__(self,player,shapes):
@@ -130,20 +140,20 @@ class Level:
     def update(self,app):
         if self.gameover: return
         p = self.player
-        hexagons = self.shapes
+        shapes = self.shapes
         # collisions
-        for h in hexagons:
-            if h.radius - p.radius < p.size + h.thickness/2 and h.radius - p.radius > 0:    # check distance
-                if floor((p.angle +120)%360/60) != h.slot:                                  # check angle
+        for s in shapes:
+            if s.radius > p.radius+p.size: break                # if shape is too far out
+            elif not s.radius+s.thickness < p.radius-p.size:    # if shape has not already passed
+                if s.collision(p):                              # check angle of player to detect collision
                     self.gameover = True
                     return
-            elif h.radius > p.radius: break
         # movement
-        for h in hexagons:
-            h.radius -= SHRINK_SPEED * (1+app.level.score/20.)
-            if h.radius < h.thickness:
-                hexagons.remove(h)
-                hexagons.append(Hexagon(WIDTH))
+        for s in shapes:
+            s.radius -= SHRINK_SPEED * (1+app.level.score/20.)
+            if s.radius < s.thickness:
+                shapes.remove(s)
+                shapes.append(Shape(randint(3,6),WIDTH))
                 self.score += 1
         app.frame+=1
         return False
@@ -204,7 +214,7 @@ def main():
             glutLeaveMainLoop()
             return
         if key == b' ': # SPACE key
-            app.level = Level(Player(RADIUS, SIZE),[Hexagon(WIDTH),Hexagon(WIDTH*1.5)])
+            app.level = Level(Player(RADIUS, SIZE),[Shape(randint(3,6),WIDTH),Shape(randint(3,6),WIDTH*1.5)])
             return
         #check if non-special character
         key = key.decode()
@@ -225,7 +235,7 @@ def main():
     glutKeyboardUpFunc( keyboard_up )    
     glutPassiveMotionFunc( mouse_move )
     
-    app.level_setup = (Player(RADIUS, SIZE),[Hexagon(WIDTH),Hexagon(WIDTH*1.5)])
+    app.level_setup = (Player(RADIUS, SIZE),[Shape(randint(3,6),WIDTH),Shape(randint(3,6),WIDTH*1.5)])
     app.level = Level(*app.level_setup)
     
     glClearColor(1, 1, 1, 0);
