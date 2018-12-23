@@ -7,7 +7,7 @@ from math import pi, cos, sin, sqrt, floor, acos
 from random import randint
 
 TITLE = "Polydodge"
-WIDTH, HEIGHT =800, 600
+WIDTH,HEIGHT = 800,600
 SPEED = 24
 RADIUS = 60
 SIZE = 10
@@ -36,9 +36,8 @@ def text(string, x, y, size, color=(0,0,0)):
         linetext(line, x, y-offset, size, color=color)
 
 class App:
-    def __init__(self, title="My 2D OGL App"):
+    def __init__(self, title):
         self.title = title
-        self.fps = 30.
         self.frame = 0
         return
 
@@ -74,14 +73,12 @@ class Player:
         
         @use_color(*self.color)
         def circle(radius):
-            triangleAmount = 24
-            twicePi = 2 * pi
-	
+            triangleAmount = 24	
             glBegin(GL_TRIANGLE_FAN)
             glVertex2f(0,0)
             for i in range(triangleAmount+1):
-                glVertex2f((radius * cos(i *  twicePi / triangleAmount)), 
-                               (radius * sin(i * twicePi / triangleAmount)))
+                glVertex2f((radius * cos(i *  2*pi / triangleAmount)), 
+                               (radius * sin(i * 2*pi / triangleAmount)))
             glEnd()
             
         circle(self.size)
@@ -92,14 +89,12 @@ class Shape:
     color = (1,0,0)
     def __init__(self,sides,radius):
         self.radius = radius
-        self.sides = sides
-        self.slot =randint(0,self.sides-1)
+        self.sides  = sides
+        self.slot   = randint(0,self.sides-1)
         return
     
     def display(self):
-        #use cosine rule to calculate side_length
-        self.side = sqrt(2*self.radius*self.radius - 2*self.radius*self.radius*cos(2*pi/self.sides))
-        #draw the shape
+        # draw the shape
         @use_color(*self.color)
         def shape():
             for i in range(0,self.sides):
@@ -108,6 +103,7 @@ class Shape:
                     a = 360/self.sides * i
                     glRotate(a,0,0,1)
                     glBegin(GL_QUADS)
+                    # some nice trig...
                     glVertex2f(self.radius,0)
                     glVertex2f(self.thickness+self.radius, 0)
                     glVertex2f((self.radius+self.thickness)*cos(2*pi/self.sides),
@@ -115,9 +111,8 @@ class Shape:
                     glVertex2f(self.radius*cos(2*pi/self.sides), self.radius*sin(2*pi/self.sides))
                     glEnd()
                     glPopMatrix()
-            return     
-        shape()
-        return
+            return
+        return shape()
 
     def collision(self,player):
         lowerbound = self.slot*360/self.sides
@@ -139,23 +134,22 @@ class Level:
     def update(self,app):
         if self.gameover: return
         p = self.player
-        shapes = self.shapes
         # collisions
-        for s in shapes:
+        for s in self.shapes:
             if s.radius > p.radius+p.size: break                # if shape is too far out
             elif not s.radius+s.thickness < p.radius-p.size:    # if shape has not already passed
                 if s.collision(p):                              # check angle of player to detect collision
                     self.gameover = True
                     return
         # movement
-        for s in shapes:
+        for s in self.shapes:
             s.radius -= SHRINK_SPEED * (1+app.level.score/20.)
             if s.radius < s.thickness:
-                shapes.remove(s)
-                shapes.append(Shape(randint(3,6),WIDTH))
+                self.shapes.remove(s)
+                self.shapes.append(Shape(randint(3,6),WIDTH))
                 self.score += 1
         app.frame+=1
-        return False
+        return
 
     def render(self):
         self.player.display()
@@ -194,10 +188,6 @@ def main():
 
     def mouse_button(button, state, x, y):
         ''' state 0 is down; state 1 is up '''
-        if app.level.gameover:
-            if button == 0:
-                return
-            return
         if button == 4: #scroll down
             app.level.player.angle -= SPEED*state
             return
@@ -213,7 +203,8 @@ def main():
             glutLeaveMainLoop()
             return
         if key == b' ': # SPACE key
-            app.level = Level(Player(RADIUS, SIZE),[Shape(randint(3,6),WIDTH),Shape(randint(3,6),WIDTH*1.5)])
+            if app.level.gameover:
+                app.level = Level(Player(RADIUS, SIZE),[Shape(randint(3,6),WIDTH),Shape(randint(3,6),WIDTH*1.5)])
             return
         #check if non-special character
         key = key.decode()
