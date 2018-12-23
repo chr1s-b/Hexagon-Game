@@ -148,7 +148,6 @@ class Level:
                 self.shapes.remove(s)
                 self.shapes.append(Shape(randint(3,6),WIDTH))
                 self.score += 1
-        app.frame+=1
         return
 
     def render(self):
@@ -163,27 +162,42 @@ def main():
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
         glLoadIdentity()
         glOrtho(0,WIDTH,HEIGHT,0,-1,1)
-        
-        # center matrix
-        glPushMatrix()
-        glTranslate(WIDTH/2, HEIGHT/2, 0)
-        # slowly rotate
-        glRotate(app.frame*ROTATION_SPEED,0,0,1)
-        # update level
-        app.level.update(app)
-        # render level
-        app.level.render()
-        # uncenter matrix
-        glPopMatrix()
+        if app.mainmenu:
+            # render main menu
+            glLineWidth(4)
+            text(TITLE.upper(), WIDTH/2-140, HEIGHT/4, 48)
+            glLineWidth(2)
+            # implement slow flashing text
+            frequency = 800
+            a = sin((app.frame%frequency)/frequency *2* pi)
+            text("Press SPACE to start", WIDTH/2-200, HEIGHT/2, 32,color=(a,a,a))
+            text("""\
+Controls:
+SCROLL UP    rotate clockwise
+SCROLL DOWN  rotate anticlockwise""", 20, 3*HEIGHT/4, 24)
+        else:
+            # else render level:
+            # center matrix
+            glPushMatrix()
+            glTranslate(WIDTH/2, HEIGHT/2, 0)
+            # slowly rotate
+            glRotate(app.frame*ROTATION_SPEED,0,0,1)
+            # update level
+            app.level.update(app)
+            # render level
+            app.level.render()
+            # uncenter matrix
+            glPopMatrix()
 
-        # display text
-        glLineWidth(4)
-        text("Score: {}".format(app.level.score), 4, 4, 24)
-        
-        # gameover state...
-        if app.level.gameover:
-            text("Game over!\nPress SPACE\nto play again", WIDTH/2-120, HEIGHT/2-48, 32)
+            # display text
+            glLineWidth(4)
+            text("Score: {}".format(app.level.score), 4, 4, 24)
+            
+            # gameover state...
+            if app.level.gameover:
+                text("Game over!\nPress SPACE\nto play again", WIDTH/2-120, HEIGHT/2-48, 32)
         glutSwapBuffers()
+        app.frame += 1
         return
 
     def mouse_button(button, state, x, y):
@@ -205,6 +219,8 @@ def main():
         if key == b' ': # SPACE key
             if app.level.gameover:
                 app.level = Level(Player(RADIUS, SIZE),[Shape(randint(3,6),WIDTH),Shape(randint(3,6),WIDTH*1.5)])
+            if app.mainmenu:
+                app.mainmenu = False
             return
         #check if non-special character
         key = key.decode()
@@ -227,7 +243,7 @@ def main():
     
     app.level_setup = (Player(RADIUS, SIZE),[Shape(randint(3,6),WIDTH),Shape(randint(3,6),WIDTH*1.5)])
     app.level = Level(*app.level_setup)
-    
+    app.mainmenu = True
     glClearColor(1, 1, 1, 0);
     glutMainLoop()
     return
