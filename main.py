@@ -1,4 +1,3 @@
-# library version of 2dexample.py (2d ogl)
 import sys, time
 from OpenGL.GL import *
 from OpenGL.GLU import *
@@ -7,7 +6,7 @@ from textureandcolor import *
 from math import pi, cos, sin, sqrt, floor, acos
 from random import randint
 
-TITLE = "Hexagon!"
+TITLE = "Polydodge"
 WIDTH, HEIGHT =800, 600
 SPEED = 24
 RADIUS = 60
